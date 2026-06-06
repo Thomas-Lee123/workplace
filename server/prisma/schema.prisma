@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  trips Trip[]
+
+  @@map("users")
+}
+
+model Trip {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  title       String
+  destination String
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+  coverImage  String?  @map("cover_image")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  days Day[]
+
+  @@map("trips")
+}
+
+model Day {
+  id        String   @id @default(uuid())
+  tripId    String   @map("trip_id")
+  date      DateTime
+  label     String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  trip  Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  items Item[]
+
+  @@map("days")
+}
+
+model Item {
+  id        String   @id @default(uuid())
+  dayId     String   @map("day_id")
+  type      String   @default("custom")
+  title     String
+  subtitle  String   @default("")
+  sortOrder Int      @default(0) @map("sort_order")
+  source    String   @default("manual")
+  sourceUrl String?  @map("source_url")
+  price     Float?
+  imageUrl  String?  @map("image_url")
+  date      DateTime?
+  note      String   @default("")
+  status    String   @default("pending")
+  meta      Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  day Day @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  @@map("items")
+}
