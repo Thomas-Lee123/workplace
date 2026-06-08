@@ -69,7 +69,8 @@
       "Bash(npm install *)",
       "Bash(where psql *)",
       "Bash(docker --version)",
-      "Bash(docker info *)"
+      "Bash(docker info *)",
+      "Bash(tar -czf dist.tar.gz -C dist .)"
     ]
   }
 }

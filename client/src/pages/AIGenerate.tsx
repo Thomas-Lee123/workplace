@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { streamAIGenerate, streamAIChat, aiApplyChanges, type SSEEvent, type Trip } from '../api';
+import { useT } from '../i18n';
 
-export default function AIGenerate() {
+export default function AIGenerate({ onClose }: { onClose?: () => void }) {
+  const { t } = useT();
   const navigate = useNavigate();
   const [step, setStep] = useState<'input' | 'generating' | 'review'>('input');
   const [prompt, setPrompt] = useState('');
@@ -78,7 +80,7 @@ export default function AIGenerate() {
           });
         } else if (e.error) {
           setError(e.error);
-          setChatMessages(prev => [...prev, { role: 'ai', text: '抱歉，出错了：' + e.error }]);
+          setChatMessages(prev => [...prev, { role: 'ai', text: t('common.error') + ': ' + e.error }]);
         } else if (e.reply) {
           setChatMessages(prev => [...prev, { role: 'ai', text: e.reply || '' }]);
         }
@@ -87,7 +89,7 @@ export default function AIGenerate() {
         try {
           const updated = await aiApplyChanges(trip.id, tripData);
           setTrip(updated);
-          setChatMessages(prev => [...prev, { role: 'ai', text: (changes || '已应用修改') + '\n\n行程已更新。' }]);
+          setChatMessages(prev => [...prev, { role: 'ai', text: (changes || t('tripDetail.applied')) + '\n\n' + t('ai.tripUpdated') }]);
         } catch (err: any) {
           setError(err.message);
         } finally {
@@ -96,7 +98,7 @@ export default function AIGenerate() {
       },
       (err: Error) => {
         setError(err.message);
-        setChatMessages(prev => [...prev, { role: 'ai', text: '抱歉，出错了：' + err.message }]);
+        setChatMessages(prev => [...prev, { role: 'ai', text: t('common.error') + ': ' + err.message }]);
         setChatting(false);
       },
     );
@@ -108,7 +110,7 @@ export default function AIGenerate() {
     try {
       const updated = await aiApplyChanges(trip.id, tripData);
       setTrip(updated);
-      setChatMessages(prev => [...prev, { role: 'ai', text: '已应用修改到行程！' }]);
+      setChatMessages(prev => [...prev, { role: 'ai', text: t('ai.changesApplied') }]);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -117,7 +119,6 @@ export default function AIGenerate() {
   }
 
   async function handleFinish() {
-    // Parse the last AI message for any JSON trip data that wasn't applied
     const lastAIMsg = [...chatMessages].reverse().find(m => m.role === 'ai');
     if (lastAIMsg) {
       const jsonMatch = lastAIMsg.text.match(/```json\s*([\s\S]*?)\s*```/);
@@ -131,11 +132,14 @@ export default function AIGenerate() {
       }
     }
     navigate(`/trip/${trip!.id}`);
+    onClose?.();
   }
 
   function handleCancel() {
     controllerRef.current?.abort();
-    if (trip) {
+    if (onClose) {
+      onClose();
+    } else if (trip) {
       navigate(`/trip/${trip.id}`);
     } else {
       navigate('/');
@@ -144,170 +148,136 @@ export default function AIGenerate() {
 
   return (
     <div className="page">
-      <header className="header">
-        <button className="btn-sm" onClick={handleCancel}>← 返回</button>
-        <h3>AI 生成行程</h3>
-      </header>
+      <div className="header">
+        <button className="btn btn-sm" onClick={handleCancel}>{t('common.back')}</button>
+        <h3>{t('ai.title')}</h3>
+      </div>
 
-      <div className="container">
-        {/* Step 1: Input prompt */}
-        {step === 'input' && (
-          <div className="parse-section" style={{ marginTop: 16 }}>
-            <p style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>
-              用自然语言描述你的旅行计划，AI 会实时生成完整行程
-            </p>
-            <textarea
-              placeholder="例如：我想五一去成都玩3天，预算3000以内，喜欢吃辣的，想去大熊猫基地、宽窄巷子、都江堰，住春熙路附近"
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              rows={5}
-              style={{ width: '100%', resize: 'vertical', marginBottom: 12 }}
-              autoFocus
-            />
-            {error && <div className="error">{error}</div>}
-            <button className="btn-primary btn-full" onClick={handleGenerate} disabled={!prompt.trim()}>
-              开始生成
-            </button>
+      {step === 'input' && (
+        <div className="section">
+          <div className="section-hint">{t('ai.description')}</div>
+          <textarea
+            placeholder={t('ai.placeholder')}
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            rows={5}
+            style={{ width: '100%', resize: 'vertical', marginBottom: 12 }}
+            autoFocus
+          />
+          {error && <div className="error">{error}</div>}
+          <button className="btn btn-full" onClick={handleGenerate} disabled={!prompt.trim()}>
+            {t('ai.generate')}
+          </button>
+        </div>
+      )}
+
+      {step === 'generating' && (
+        <div className="section">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div className="spinner" />
+            <span style={{ color: '#9b9a97' }}>{t('ai.planning')}</span>
           </div>
-        )}
-
-        {/* Step 2: Streaming generation */}
-        {step === 'generating' && (
-          <div className="parse-section" style={{ marginTop: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <div className="spinner" />
-              <span style={{ color: '#1677ff', fontWeight: 500 }}>AI 正在规划行程...</span>
-            </div>
-            <div
-              ref={streamRef}
-              style={{
-                background: '#f8f9fa',
-                borderRadius: 8,
-                padding: 16,
-                maxHeight: 400,
-                overflow: 'auto',
-                whiteSpace: 'pre-wrap',
-                fontSize: 14,
-                lineHeight: 1.8,
-              }}
-            >
-              {streamText || '等待 AI 响应...'}
-            </div>
-            <button className="btn-sm" style={{ marginTop: 12 }} onClick={handleCancel}>取消</button>
+          <div ref={streamRef} className="stream-box">
+            {streamText || t('ai.waiting')}
           </div>
-        )}
+          <button className="btn btn-sm" style={{ marginTop: 12 }} onClick={handleCancel}>{t('common.cancel')}</button>
+        </div>
+      )}
 
-        {/* Step 3: Review & Chat */}
-        {step === 'review' && trip && (
-          <>
-            {/* Trip preview */}
-            <div className="parse-section" style={{ marginTop: 16 }}>
-              <div className="parse-result confidence-high" style={{ marginBottom: 12 }}>
-                ✅ 行程已生成：{trip.title}
-              </div>
+      {step === 'review' && trip && (
+        <>
+          <div className="section">
+            <div className="parse-result confidence-high">
+              {t('ai.generated')}{trip.title}
+            </div>
 
-              <div style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
-                {trip.destination} | {trip.days.length}天 | 共 {trip.days.reduce((n, d) => n + d.items.length, 0)} 个项目 |
-                预算 ¥{trip.days.reduce((n, d) => n + d.items.reduce((s, i) => s + (i.price || 0), 0), 0).toLocaleString()}
-              </div>
+            <div style={{ fontSize: 13, color: '#9b9a97', marginBottom: 16, marginTop: 4 }}>
+              {trip.destination} &middot; {trip.days.length} {t('import.parsedDays')} &middot; {trip.days.reduce((n, d) => n + d.items.length, 0)} {t('tripDetail.items')} &middot;
+              {t('tripDetail.budget')} {(trip.days.reduce((n, d) => n + d.items.reduce((s, i) => s + (i.price || 0), 0), 0)).toLocaleString()}
+            </div>
 
+            <div className="preview-days">
               {trip.days.map(day => (
-                <div key={day.id} style={{ marginBottom: 8 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
-                    {day.label} — {new Date(day.date).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
+                <div key={day.id} className="preview-day">
+                  <div className="preview-day-header">
+                    {day.label} &mdash; {new Date(day.date).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
                   </div>
                   {day.items.map(item => (
-                    <div key={item.id} style={{ fontSize: 13, padding: '2px 0 2px 12px', color: '#666' }}>
-                      {({ hotel: '🏨', attraction: '🎫', traffic: '🚄', meal: '🍽', custom: '📌' } as any)[item.type] || '📌'}{' '}
-                      {item.title}
-                      {item.price ? <span style={{ color: '#ff4d4f', marginLeft: 8 }}>¥{item.price.toLocaleString()}</span> : null}
+                    <div key={item.id} className="preview-item">
+                      {t(`type.${item.type}`)}: {item.title}
+                      {item.price ? <span style={{ color: '#e03e2d', marginLeft: 8 }}>{item.price.toLocaleString()}</span> : null}
                     </div>
                   ))}
                 </div>
               ))}
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button className="btn-primary" onClick={handleFinish}>确认，查看行程</button>
-                <button className="btn-sm" onClick={handleCancel}>取消</button>
-              </div>
             </div>
 
-            {/* Chat section */}
-            <div className="parse-section">
-              <h4 style={{ marginBottom: 8, fontSize: 15 }}>和 AI 讨论修改</h4>
-              <div
-                ref={streamRef}
-                style={{
-                  background: '#f8f9fa',
-                  borderRadius: 8,
-                  padding: 12,
-                  maxHeight: 300,
-                  overflow: 'auto',
-                  marginBottom: 8,
-                }}
-              >
-                {chatMessages.map((msg, i) => (
-                  <div key={i} style={{
-                    marginBottom: 8,
-                    textAlign: msg.role === 'user' ? 'right' : 'left',
-                  }}>
-                    <div style={{
-                      display: 'inline-block',
-                      background: msg.role === 'user' ? '#1677ff' : '#fff',
-                      color: msg.role === 'user' ? '#fff' : '#333',
-                      padding: '6px 12px',
-                      borderRadius: 12,
-                      maxWidth: '85%',
-                      fontSize: 14,
-                      whiteSpace: 'pre-wrap',
-                      textAlign: 'left',
-                      boxShadow: msg.role === 'ai' ? '0 1px 3px rgba(0,0,0,.1)' : 'none',
-                    }}>
-                      {msg.text}
-                      {msg.role === 'ai' && (() => {
-                        const jsonMatch = msg.text.match(/```json\s*([\s\S]*?)\s*```/);
-                        if (jsonMatch) {
-                          try {
-                            const data = JSON.parse(jsonMatch[1]);
-                            if (data.trip) {
-                              return (
-                                <button
-                                  className="btn-primary btn-sm"
-                                  style={{ marginTop: 8, display: 'block' }}
-                                  onClick={() => handleApply(data.trip)}
-                                  disabled={applying}
-                                >
-                                  {applying ? '应用中...' : '应用此修改'}
-                                </button>
-                              );
-                            }
-                          } catch {}
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button className="btn" onClick={handleFinish}>{t('ai.confirm')}</button>
+              <button className="btn btn-sm btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
+            </div>
+          </div>
+
+          <div className="section">
+            <h4 style={{ marginBottom: 8, fontSize: 15, fontWeight: 600 }}>{t('ai.chatTitle')}</h4>
+            <div
+              ref={streamRef}
+              style={{
+                border: '1px solid #e9e9e7',
+                borderRadius: 6,
+                padding: 12,
+                maxHeight: 300,
+                overflow: 'auto',
+                marginBottom: 8,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`chat-msg ${msg.role}`}>
+                  {msg.text}
+                  {msg.role === 'ai' && (() => {
+                    const jsonMatch = msg.text.match(/```json\s*([\s\S]*?)\s*```/);
+                    if (jsonMatch) {
+                      try {
+                        const data = JSON.parse(jsonMatch[1]);
+                        if (data.trip) {
+                          return (
+                            <button
+                              className="btn btn-sm"
+                              style={{ marginTop: 8, display: 'block' }}
+                              onClick={() => handleApply(data.trip)}
+                              disabled={applying}
+                            >
+                              {applying ? t('ai.applying') : t('ai.applyChanges')}
+                            </button>
+                          );
                         }
-                        return null;
-                      })()}
-                    </div>
-                  </div>
-                ))}
-                {chatting && (
-                  <div style={{ color: '#999', fontSize: 13 }}>AI 思考中...</div>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleChat(); }}
-                  placeholder="例如：把第二天酒店换成便宜点的、增加一个第三天去迪士尼..."
-                  style={{ flex: 1 }}
-                />
-                <button className="btn-primary btn-sm" onClick={handleChat} disabled={chatting || !chatInput.trim()}>
-                  发送
-                </button>
-              </div>
+                      } catch {}
+                    }
+                    return null;
+                  })()}
+                </div>
+              ))}
+              {chatting && (
+                <div style={{ color: '#9b9a97', fontSize: 13 }}>{t('ai.thinking')}</div>
+              )}
             </div>
-          </>
-        )}
-      </div>
+            <div className="parse-input-row">
+              <input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleChat(); }}
+                placeholder={t('ai.chatPlaceholder')}
+              />
+              <button className="btn btn-sm" onClick={handleChat} disabled={chatting || !chatInput.trim()}>
+                {t('common.send')}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { login, register, type User } from '../api';
+import { useT } from '../i18n';
 
 export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
+  const { t } = useT();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,7 +18,7 @@ export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
     setLoading(true);
 
     if (mode === 'register' && password !== confirmPassword) {
-      setError('两次密码不一致');
+      setError(t('login.passwordMismatch'));
       setLoading(false);
       return;
     }
@@ -36,19 +38,19 @@ export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>一键旅行</h1>
-        <p className="auth-subtitle">旅行行程"购物车"</p>
+        <h1>{t('login.appName')}</h1>
+        <p className="auth-subtitle">{t('login.appSubtitle')}</p>
 
         <div className="auth-tabs">
-          <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>登录</button>
-          <button className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>注册</button>
+          <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>{t('login.signIn')}</button>
+          <button className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>{t('login.signUp')}</button>
         </div>
 
         <form onSubmit={handleSubmit}>
           {mode === 'register' && (
             <input
               type="text"
-              placeholder="名字"
+              placeholder={t('login.name')}
               value={name}
               onChange={e => setName(e.target.value)}
               required
@@ -56,14 +58,14 @@ export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
           )}
           <input
             type="email"
-            placeholder="邮箱"
+            placeholder={t('login.email')}
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
           />
           <input
             type="password"
-            placeholder="密码"
+            placeholder={t('login.password')}
             value={password}
             onChange={e => setPassword(e.target.value)}
             minLength={8}
@@ -72,7 +74,7 @@ export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
           {mode === 'register' && (
             <input
               type="password"
-              placeholder="确认密码"
+              placeholder={t('login.confirmPassword')}
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
               minLength={8}
@@ -82,8 +84,8 @@ export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
 
           {error && <div className="error">{error}</div>}
 
-          <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? '...' : mode === 'login' ? '登录' : '注册'}
+          <button type="submit" disabled={loading} className="btn btn-full">
+            {loading ? '...' : mode === 'login' ? t('login.signIn') : t('login.signUp')}
           </button>
         </form>
       </div>

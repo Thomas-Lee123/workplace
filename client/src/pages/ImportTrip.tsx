@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getTrip, getTrips, createTrip, addItem, importFile, aiParseText, parseUrlToTrip, type Trip, type ImportResult } from '../api';
+import { useT } from '../i18n';
 
 function defaultDates() {
   const now = new Date();
@@ -15,10 +16,13 @@ function defaultDates() {
   };
 }
 
-export default function ImportTrip() {
+export default function ImportTrip({ trips: propTrips, onTripsChange, onClose }: { trips?: Trip[]; onTripsChange?: () => void; onClose?: () => void }) {
+  void onTripsChange;
+  const { t } = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [localTrips, setLocalTrips] = useState<Trip[]>([]);
+  const trips = propTrips ?? localTrips;
   const [trip, setTrip] = useState<Trip | null>(null);
   const [isNewTrip, setIsNewTrip] = useState(false);
   const [importMode, setImportMode] = useState<'file' | 'url'>('file');
@@ -34,7 +38,7 @@ export default function ImportTrip() {
     if (id) {
       getTrip(id).then(setTrip);
     } else {
-      getTrips().then(setTrips);
+      getTrips().then(setLocalTrips);
     }
   }, [id]);
 
@@ -88,12 +92,11 @@ export default function ImportTrip() {
       let targetTrip = trip;
 
       if (!targetTrip) {
-        // Creating new trip from parsed data
         const dates = defaultDates();
         const d = result;
         targetTrip = await createTrip({
-          title: d.title || '导入行程',
-          destination: d.destination || '未知目的地',
+          title: d.title || t('import.title'),
+          destination: d.destination || 'Unknown',
           startDate: d.startDate || dates.startDate,
           endDate: d.endDate || dates.endDate,
         });
@@ -118,6 +121,7 @@ export default function ImportTrip() {
       }
 
       navigate(`/trip/${targetTrip.id}`);
+      onClose?.();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -125,51 +129,50 @@ export default function ImportTrip() {
     }
   }
 
-  // ---- Step 1: Pick destination trip (standalone only) ----
   const [selectedTripId, setSelectedTripId] = useState(id || '');
   const [picked, setPicked] = useState(!!id);
 
   if (!id && !picked) {
     return (
       <div className="page">
-        <header className="header">
-          <button className="btn-sm" onClick={() => navigate('/')}>← 返回</button>
-          <h3>导入行程</h3>
-        </header>
-        <div className="container">
-          <p className="parse-hint" style={{ marginBottom: 12 }}>选择导入方式：</p>
+        <div className="header">
+          <button className="btn btn-sm" onClick={() => onClose ? onClose() : navigate('/')}>{t('common.back')}</button>
+          <h3>{t('import.title')}</h3>
+        </div>
+        <div>
+          <p className="section-hint">{t('import.chooseMethod')}</p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button
-              className="btn-primary btn-full"
+              className="btn btn-full"
               onClick={() => {
                 setSelectedTripId('new');
                 setIsNewTrip(true);
                 setPicked(true);
               }}
             >
-              + 新建行程（由导入内容自动生成）
+              {t('import.newTrip')}
             </button>
 
-            <p className="parse-hint" style={{ textAlign: 'center', margin: '4px 0' }}>或导入到已有行程：</p>
+            <p className="section-hint" style={{ textAlign: 'center', margin: '4px 0' }}>{t('import.orExisting')}</p>
 
             {trips.length === 0 ? (
-              <div className="empty">还没有行程</div>
+              <div className="empty">{t('import.noTrips')}</div>
             ) : (
               <select
                 value={selectedTripId}
                 onChange={e => setSelectedTripId(e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', fontSize: 14 }}
+                style={{ width: '100%', padding: '8px 12px', fontSize: 14, border: '1px solid #e9e9e7', borderRadius: 4, background: '#fff' }}
               >
-                <option value="">选择行程...</option>
+                <option value="">{t('import.selectTrip')}</option>
                 {trips.map(t => (
-                  <option key={t.id} value={t.id}>{t.title} — {t.destination}</option>
+                  <option key={t.id} value={t.id}>{t.title} &mdash; {t.destination}</option>
                 ))}
               </select>
             )}
 
             <button
-              className="btn-primary btn-full"
+              className="btn btn-full"
               disabled={!selectedTripId || selectedTripId === 'new'}
               onClick={() => {
                 getTrip(selectedTripId).then(t => {
@@ -177,9 +180,8 @@ export default function ImportTrip() {
                   setPicked(true);
                 });
               }}
-              style={{ background: '#722ed1' }}
             >
-              导入到已有行程
+              {t('import.importExisting')}
             </button>
           </div>
         </div>
@@ -187,158 +189,147 @@ export default function ImportTrip() {
     );
   }
 
-  // ---- Step 2: Import content ----
   const targetTrip = trip;
 
   return (
     <div className="page">
-      <header className="header">
-        <button className="btn-sm" onClick={() => navigate(trip ? `/trip/${trip.id}` : '/')}>← 返回</button>
-        <h3>导入行程 {isNewTrip ? '(新建)' : targetTrip ? `→ ${targetTrip.title}` : ''}</h3>
-      </header>
+      <div className="header">
+        <button className="btn btn-sm" onClick={() => onClose ? onClose() : navigate(trip ? `/trip/${trip.id}` : '/')}>{t('common.back')}</button>
+        <h3>{t('import.title')} {isNewTrip ? `(${t('import.newLabel')})` : targetTrip ? `-> ${targetTrip.title}` : ''}</h3>
+      </div>
 
-      <div className="container">
-        <div className="parse-section">
-          <div style={{ display: 'flex', gap: 0, marginBottom: 16 }}>
-            <button
-              className="btn-sm"
-              style={{ flex: 1, borderRadius: '8px 0 0 8px', background: importMode === 'file' ? '#1677ff' : '#f0f0f0', color: importMode === 'file' ? '#fff' : '#333', border: 'none' }}
-              onClick={() => setImportMode('file')}
-            >上传文件</button>
-            <button
-              className="btn-sm"
-              style={{ flex: 1, borderRadius: '0 8px 8px 0', background: importMode === 'url' ? '#1677ff' : '#f0f0f0', color: importMode === 'url' ? '#fff' : '#333', border: 'none' }}
-              onClick={() => setImportMode('url')}
-            >粘贴链接</button>
-          </div>
+      <div>
+        <div style={{ display: 'flex', gap: 0, marginBottom: 16 }} className="import-tabs">
+          <button
+            className={`btn btn-sm ${importMode === 'file' ? '' : 'btn-secondary'}`}
+            style={{ flex: 1, borderRadius: '8px 0 0 8px', border: 'none', background: importMode === 'file' ? '#37352f' : '#f0f0f0', color: importMode === 'file' ? '#fff' : '#37352f' }}
+            onClick={() => setImportMode('file')}
+          >{t('import.uploadFile')}</button>
+          <button
+            className={`btn btn-sm ${importMode === 'url' ? '' : 'btn-secondary'}`}
+            style={{ flex: 1, borderRadius: '0 8px 8px 0', border: 'none', background: importMode === 'url' ? '#37352f' : '#f0f0f0', color: importMode === 'url' ? '#fff' : '#37352f' }}
+            onClick={() => setImportMode('url')}
+          >{t('import.pasteUrl')}</button>
+        </div>
 
         {importMode === 'file' ? (
           <>
-            <p className="parse-hint">支持 Word (.docx)、Excel (.xlsx/.csv)、Markdown (.md) 文件</p>
-            <p className="parse-hint" style={{ fontSize: 12, marginTop: 4 }}>
-              Excel 列名支持: 天/Day/Label、类型/Type、标题/Title/名称、价格/Price/费用、备注/Note
-            </p>
+            <p className="parse-hint">{t('import.fileHint')}</p>
+            <p className="parse-hint" style={{ fontSize: 12, marginTop: 4 }}>{t('import.excelHint')}</p>
           </>
         ) : (
-          <p className="parse-hint">粘贴携程、飞猪、马蜂窝等网站的跟团游/自由行链接，AI 自动解析为自由行行程</p>
+          <p className="parse-hint">{t('import.urlHint')}</p>
         )}
 
-          {!result && (
-            <>
-              {importMode === 'file' ? (
-                <div className="parse-input-row" style={{ flexDirection: 'column', gap: 12 }}>
-                  <input
-                    type="file"
-                    accept=".docx,.md,.xlsx,.xls,.csv,.txt"
-                    onChange={e => setFile(e.target.files?.[0] || null)}
-                  />
-                  <button
-                    onClick={handleImport}
-                    disabled={!file || importing}
-                    className="btn-primary btn-full"
-                  >
-                    {importing ? '解析中...' : '开始导入'}
-                  </button>
-                </div>
-              ) : (
-                <div className="parse-input-row" style={{ flexDirection: 'column', gap: 12 }}>
-                  <input
-                    type="url"
-                    placeholder="粘贴跟团游/自由行链接..."
-                    value={importUrl}
-                    onChange={e => setImportUrl(e.target.value)}
-                  />
-                  <button
-                    onClick={handleUrlImport}
-                    disabled={!importUrl.trim() || importing}
-                    className="btn-primary btn-full"
-                    style={{ background: '#722ed1' }}
-                  >
-                    {importing ? 'AI 解析中...' : 'AI 智能解析'}
-                  </button>
-                </div>
-              )}
-              {error && <div className="error">{error}</div>}
-            </>
-          )}
-
-          {result && (
-            <div className="parse-result confidence-high" style={{ marginBottom: 16 }}>
-              ✅ 成功解析 {result.days.length} 天，共 {result.days.reduce((n, d) => n + d.items.length, 0)} 个项目
-              {result.title && <div style={{ marginTop: 4, fontSize: 13 }}>行程: {result.title}</div>}
-              {result.destination && <div style={{ fontSize: 13 }}>目的地: {result.destination}</div>}
-              {result.rawText && (
-                <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
-                  未能结构化解析，已将原始文本保留
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {result && result.days.length > 0 && (
+        {!result && (
           <>
-            <div className="preview-section">
-              <h4 style={{ marginBottom: 12 }}>预览导入内容</h4>
-              {result.days.map((day, di) => (
-                <div key={di} className="day-section">
-                  <div className="day-header">
-                    <span className="day-label">{day.label || `第${di + 1}天`}</span>
-                    {targetTrip && (
-                      <span className="day-date" style={{ color: '#1677ff', fontSize: 12 }}>
-                        将导入至: {targetTrip.days[di]?.label || '?'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="item-list">
-                    {day.items.map((item, ii) => (
-                      <div key={ii} className="item-card" style={{ opacity: 1 }}>
-                        <div className="item-body">
-                          <div className="item-type" style={{ fontSize: 11 }}>
-                            {({ hotel: '🏨 酒店', attraction: '🎫 景点', traffic: '🚄 交通', meal: '🍽 餐饮', custom: '📌 其他' } as any)[item.type] || item.type}
-                          </div>
-                          <h4 className="item-title">{item.title}</h4>
-                          {item.subtitle && <p className="item-subtitle">{item.subtitle}</p>}
-                          <div className="item-info">
-                            {item.price && <span className="item-price">¥{item.price.toLocaleString()}</span>}
-                            {item.note && <span className="item-note">{item.note}</span>}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button className="btn-sm" onClick={() => { setResult(null); setFile(null); setImportUrl(''); }}>重新导入</button>
-              <button className="btn-primary" onClick={handleConfirm} disabled={saving}>
-                {saving ? '导入中...' : (isNewTrip ? '创建行程并导入' : '确认导入到当前行程')}
-              </button>
-            </div>
+            {importMode === 'file' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <input
+                  type="file"
+                  accept=".docx,.md,.xlsx,.xls,.csv,.txt"
+                  onChange={e => setFile(e.target.files?.[0] || null)}
+                  style={{ fontSize: 14 }}
+                />
+                <button onClick={handleImport} disabled={!file || importing} className="btn btn-full">
+                  {importing ? t('import.parsing') : t('import.import')}
+                </button>
+              </div>
+            ) : (
+              <div className="parse-input-row" style={{ flexDirection: 'column', gap: 12 }}>
+                <input
+                  type="url"
+                  placeholder={t('import.urlHint')}
+                  value={importUrl}
+                  onChange={e => setImportUrl(e.target.value)}
+                />
+                <button
+                  onClick={handleUrlImport}
+                  disabled={!importUrl.trim() || importing}
+                  className="btn btn-full"
+                >
+                  {importing ? t('import.aiParsing') : t('import.aiParse')}
+                </button>
+              </div>
+            )}
+            {error && <div className="error">{error}</div>}
           </>
         )}
 
-        {result && result.days.length === 0 && result.rawText && (
-          <div className="parse-section">
-            <div className="parse-result confidence-low">
-              ⚠️ 未能自动结构化，可通过 AI 解析生成行程
-            </div>
-            <button
-              className="btn-primary btn-full"
-              style={{ marginTop: 12, background: '#722ed1' }}
-              onClick={handleAIParse}
-              disabled={aiParsing}
-            >
-              {aiParsing ? 'AI 解析中...' : '使用 AI 智能解析'}
-            </button>
-            <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, background: '#f5f5f5', padding: 12, borderRadius: 8, marginTop: 12, maxHeight: 300, overflow: 'auto' }}>
-              {result.rawText.slice(0, 2000)}
-              {result.rawText.length > 2000 && '\n\n... (内容已截断)'}
-            </pre>
+        {result && (
+          <div className="parse-result confidence-high" style={{ marginBottom: 16 }}>
+            {t('import.parsed')} {result.days.length} {t('import.parsedDays')}, {result.days.reduce((n, d) => n + d.items.length, 0)} {t('import.parsedItems')}
+            {result.title && <div style={{ marginTop: 4, fontSize: 13 }}>{t('import.tripLabel')}: {result.title}</div>}
+            {result.destination && <div style={{ fontSize: 13 }}>{t('import.destinationLabel')}: {result.destination}</div>}
+            {result.rawText && (
+              <div style={{ marginTop: 8, fontSize: 13, color: '#9b9a97' }}>
+                {t('import.rawTextNote')}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {result && result.days.length > 0 && (
+        <>
+          <div className="preview-section">
+            <h4 style={{ marginBottom: 12, fontWeight: 600 }}>{t('import.preview')}</h4>
+            {result.days.map((day, di) => (
+              <div key={di} className="day-section">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', marginBottom: 4 }}>
+                  <span style={{ fontSize: 16, fontWeight: 600 }}>{day.label || `${t('import.day')}${di + 1}${t('import.daySuffix')}`}</span>
+                  {targetTrip && (
+                    <span style={{ color: '#9b9a97', fontSize: 12 }}>
+                      {t('import.importTo')}: {targetTrip.days[di]?.label || '?'}
+                    </span>
+                  )}
+                </div>
+                <div className="item-list">
+                  {day.items.map((item, ii) => (
+                    <div key={ii} className="item-card">
+                      <div className="item-body">
+                        <div className="item-type">{t(`type.${item.type}`)}</div>
+                        <h4 className="item-title">{item.title}</h4>
+                        {item.subtitle && <p className="item-subtitle">{item.subtitle}</p>}
+                        <div className="item-info">
+                          {item.price && <span className="item-price">{item.price.toLocaleString()}</span>}
+                          {item.note && <span className="item-note">{item.note}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button className="btn btn-sm btn-secondary" onClick={() => { setResult(null); setFile(null); setImportUrl(''); }}>{t('import.reimport')}</button>
+            <button className="btn" onClick={handleConfirm} disabled={saving}>
+              {saving ? t('import.importing') : (isNewTrip ? t('import.createAndImport') : t('import.confirm'))}
+            </button>
+          </div>
+        </>
+      )}
+
+      {result && result.days.length === 0 && result.rawText && (
+        <div className="parse-section">
+          <div className="parse-result confidence-low">
+            {t('import.structuredFailed')}
+          </div>
+          <button
+            className="btn btn-full"
+            style={{ marginTop: 12 }}
+            onClick={handleAIParse}
+            disabled={aiParsing}
+          >
+            {aiParsing ? t('import.aiParsing') : t('import.aiParseBtn')}
+          </button>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, background: '#f7f6f3', padding: 12, borderRadius: 6, marginTop: 12, maxHeight: 300, overflow: 'auto', border: '1px solid #e9e9e7' }}>
+            {result.rawText.slice(0, 2000)}
+            {result.rawText.length > 2000 && '\n\n' + t('import.truncated')}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }
