@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { getTrip, updateTrip, updateItem, updateItemStatus, deleteItem, analyzeItem, streamAIChat, aiApplyChanges, reorderItem, downloadExport, type Trip, type ItemAnalysis, type SSEEvent } from '../api';
+import { getTrip, updateTrip, updateItem, updateItemStatus, deleteItem, analyzeItem, streamAIChat, aiApplyChanges, reorderItem, downloadExport, proxyImageUrl, type Trip, type ItemAnalysis, type SSEEvent } from '../api';
 import { useT } from '../i18n';
 
 const TYPE_ORDER: Record<string, number> = { traffic: 0, hotel: 1, attraction: 2, meal: 3, custom: 4 };
@@ -248,7 +248,7 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
                     </div>
 
                     {item.imageUrl && (
-                      <img src={item.imageUrl} alt="" className="block-img" />
+                      <img src={proxyImageUrl(item.imageUrl)} alt="" className="block-img" />
                     )}
 
                     <div className="block-body">

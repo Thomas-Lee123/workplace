@@ -1,5 +1,11 @@
 const BASE = '/api';
 
+export function proxyImageUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('/') || url.startsWith('data:')) return url;
+  return `${BASE}/proxy/image?url=${encodeURIComponent(url)}`;
+}
+
 function token() {
   return localStorage.getItem('token') || '';
 }

@@ -6,6 +6,7 @@ import parseRoutes from './routes/parse';
 import importRoutes from './routes/import';
 import aiRoutes from './routes/ai';
 import exportRoutes from './routes/export';
+import proxyRoutes from './routes/proxy';
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use('/api/parse', parseRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/proxy', proxyRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
