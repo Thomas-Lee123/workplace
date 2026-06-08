@@ -1,0 +1,18 @@
+{
+  "name": "一键旅行",
+  "short_name": "一键旅行",
+  "description": "旅行行程规划工具",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f6f3",
+  "theme_color": "#37352f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

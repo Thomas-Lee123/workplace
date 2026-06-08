@@ -13,6 +13,9 @@ const TRANSLATIONS: Record<string, { zh: string; en: string }> = {
   'common.error': { zh: '错误', en: 'Error' },
   'common.failed': { zh: '失败', en: 'Failed' },
 
+  // App
+  'app.name': { zh: '一键旅行', en: 'One-Click Travel' },
+
   // Login
   'login.appName': { zh: '一键旅行', en: 'One-Click Travel' },
   'login.appSubtitle': { zh: '旅行行程"购物车"', en: 'Travel Itinerary Cart' },

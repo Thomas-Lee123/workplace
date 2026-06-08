@@ -9,12 +9,13 @@ import ImportTrip from './pages/ImportTrip';
 import AIGenerate from './pages/AIGenerate';
 import './App.css';
 
-function Sidebar({ user, onLogout, trips, onTripsChange, onOpenPanel }: {
+function Sidebar({ user, onLogout, trips, onTripsChange, onOpenPanel, mobileOpen }: {
   user: User;
   onLogout: () => void;
   trips: Trip[];
   onTripsChange: () => void;
   onOpenPanel: (mode: 'ai' | 'import') => void;
+  mobileOpen?: boolean;
 }) {
   const { t, lang, setLang } = useT();
   const navigate = useNavigate();
@@ -45,7 +46,7 @@ function Sidebar({ user, onLogout, trips, onTripsChange, onOpenPanel }: {
   }
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
       <div className="sidebar-header">
         <div className="sidebar-avatar">{user.name.charAt(0)}</div>
         <div className="sidebar-user-info">
@@ -181,11 +182,17 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const { t } = useT();
   const [searchParams, setSearchParams] = useSearchParams();
   const panelMode = (searchParams.get('panel') as 'ai' | 'import') || null;
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => { setMobileSidebarOpen(false); }, [location]);
 
   function openPanel(mode: 'ai' | 'import') {
     setSearchParams(prev => { prev.set('panel', mode); return prev; });
+    setMobileSidebarOpen(false);
   }
   function closePanel() {
     setSearchParams(prev => { prev.delete('panel'); return prev; });
@@ -224,12 +231,26 @@ function AppContent() {
 
   return (
     <div className="layout">
+      <div className="mobile-topbar">
+        <button className="mobile-topbar-btn" onClick={() => setMobileSidebarOpen(true)} aria-label="Menu">
+          &#9776;
+        </button>
+        <span className="mobile-topbar-title">{t('app.name')}</span>
+        <span style={{ width: 34, flexShrink: 0 }} />
+      </div>
+
+      <div
+        className={`mobile-sidebar-overlay${mobileSidebarOpen ? ' active' : ''}`}
+        onClick={() => setMobileSidebarOpen(false)}
+      />
+
       <Sidebar
         user={user}
         onLogout={handleLogout}
         trips={trips}
         onTripsChange={loadTrips}
         onOpenPanel={openPanel}
+        mobileOpen={mobileSidebarOpen}
       />
       <AppRoutes trips={trips} onTripsChange={loadTrips} />
       {panelMode ? (
