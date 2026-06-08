@@ -3,15 +3,36 @@ import { useNavigate } from 'react-router-dom';
 import { streamAIGenerate, streamAIChat, aiApplyChanges, type SSEEvent, type Trip } from '../api';
 import { useT } from '../i18n';
 
+const AI_STATE_KEY = 'ai_generate_state';
+
+function loadAIState() {
+  try {
+    const raw = localStorage.getItem(AI_STATE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function saveAIState(state: { step: string; prompt: string; streamText: string; trip: Trip | null; chatMessages: { role: string; text: string }[] }) {
+  try {
+    localStorage.setItem(AI_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+function clearAIState() {
+  localStorage.removeItem(AI_STATE_KEY);
+}
+
 export default function AIGenerate({ onClose }: { onClose?: () => void }) {
   const { t } = useT();
   const navigate = useNavigate();
-  const [step, setStep] = useState<'input' | 'generating' | 'review'>('input');
-  const [prompt, setPrompt] = useState('');
-  const [streamText, setStreamText] = useState('');
-  const [trip, setTrip] = useState<Trip | null>(null);
+  const saved = loadAIState();
+  const [step, setStep] = useState<'input' | 'generating' | 'review'>(saved?.step || 'input');
+  const [prompt, setPrompt] = useState(saved?.prompt || '');
+  const [streamText, setStreamText] = useState(saved?.streamText || '');
+  const [trip, setTrip] = useState<Trip | null>(saved?.trip || null);
   const [error, setError] = useState('');
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>(saved?.chatMessages || []);
   const [chatInput, setChatInput] = useState('');
   const [chatting, setChatting] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -23,6 +44,11 @@ export default function AIGenerate({ onClose }: { onClose?: () => void }) {
       streamRef.current.scrollTop = streamRef.current.scrollHeight;
     }
   }, [streamText, chatMessages]);
+
+  useEffect(() => {
+    if (step === 'input' && !prompt && !trip && chatMessages.length === 0) return;
+    saveAIState({ step, prompt, streamText, trip, chatMessages });
+  }, [step, prompt, streamText, trip, chatMessages]);
 
   async function handleGenerate() {
     if (!prompt.trim()) return;
@@ -131,12 +157,14 @@ export default function AIGenerate({ onClose }: { onClose?: () => void }) {
         } catch {}
       }
     }
+    clearAIState();
     navigate(`/trip/${trip!.id}`);
     onClose?.();
   }
 
   function handleCancel() {
     controllerRef.current?.abort();
+    clearAIState();
     if (onClose) {
       onClose();
     } else if (trip) {

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { getMe, getTrips, createTrip, deleteTrip, type User, type Trip } from './api';
 import { LanguageProvider, useT } from './i18n';
@@ -177,11 +177,19 @@ function SlidePanel({ mode, onClose, trips, onTripsChange }: {
   );
 }
 
-function App() {
+function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [panelMode, setPanelMode] = useState<'ai' | 'import' | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const panelMode = (searchParams.get('panel') as 'ai' | 'import') || null;
+
+  function openPanel(mode: 'ai' | 'import') {
+    setSearchParams(prev => { prev.set('panel', mode); return prev; });
+  }
+  function closePanel() {
+    setSearchParams(prev => { prev.delete('panel'); return prev; });
+  }
 
   async function loadTrips() {
     try { const data = await getTrips(); setTrips(data); } catch {}
@@ -211,31 +219,33 @@ function App() {
   }
 
   if (!user) {
-    return (
-      <LanguageProvider>
-        <Login onLogin={(u) => { setUser(u); loadTrips(); }} />
-      </LanguageProvider>
-    );
+    return <Login onLogin={(u) => { setUser(u); loadTrips(); }} />;
   }
 
   return (
+    <div className="layout">
+      <Sidebar
+        user={user}
+        onLogout={handleLogout}
+        trips={trips}
+        onTripsChange={loadTrips}
+        onOpenPanel={openPanel}
+      />
+      <AppRoutes trips={trips} onTripsChange={loadTrips} />
+      {panelMode ? (
+        <SlidePanel mode={panelMode} onClose={closePanel} trips={trips} onTripsChange={loadTrips} />
+      ) : (
+        <ToolsPanel />
+      )}
+    </div>
+  );
+}
+
+function App() {
+  return (
     <LanguageProvider>
       <BrowserRouter>
-        <div className="layout">
-          <Sidebar
-            user={user}
-            onLogout={handleLogout}
-            trips={trips}
-            onTripsChange={loadTrips}
-            onOpenPanel={setPanelMode}
-          />
-          <AppRoutes trips={trips} onTripsChange={loadTrips} />
-          {panelMode ? (
-            <SlidePanel mode={panelMode} onClose={() => setPanelMode(null)} trips={trips} onTripsChange={loadTrips} />
-          ) : (
-            <ToolsPanel />
-          )}
-        </div>
+        <AppContent />
       </BrowserRouter>
     </LanguageProvider>
   );
