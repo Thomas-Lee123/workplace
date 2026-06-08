@@ -16,23 +16,43 @@ function defaultDates() {
   };
 }
 
+const IMPORT_STATE_KEY = 'import_state';
+
+function loadImportState() {
+  try { const raw = localStorage.getItem(IMPORT_STATE_KEY); if (raw) return JSON.parse(raw); } catch {}
+  return null;
+}
+function saveImportState(state: any) {
+  try { localStorage.setItem(IMPORT_STATE_KEY, JSON.stringify(state)); } catch {}
+}
+function clearImportState() {
+  localStorage.removeItem(IMPORT_STATE_KEY);
+}
+
 export default function ImportTrip({ trips: propTrips, onTripsChange, onClose }: { trips?: Trip[]; onTripsChange?: () => void; onClose?: () => void }) {
   void onTripsChange;
   const { t } = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const saved = loadImportState();
   const [localTrips, setLocalTrips] = useState<Trip[]>([]);
   const trips = propTrips ?? localTrips;
   const [trip, setTrip] = useState<Trip | null>(null);
-  const [isNewTrip, setIsNewTrip] = useState(false);
-  const [importMode, setImportMode] = useState<'file' | 'url'>('file');
+  const [isNewTrip, setIsNewTrip] = useState(saved?.isNewTrip || false);
+  const [importMode, setImportMode] = useState<'file' | 'url'>(saved?.importMode || 'file');
   const [file, setFile] = useState<File | null>(null);
-  const [importUrl, setImportUrl] = useState('');
+  const [importUrl, setImportUrl] = useState(saved?.importUrl || '');
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<ImportResult | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(saved?.result || null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [aiParsing, setAiParsing] = useState(false);
+
+  useEffect(() => {
+    const state: any = { importMode, importUrl, isNewTrip };
+    if (result) state.result = result;
+    saveImportState(state);
+  }, [importMode, importUrl, isNewTrip, result]);
 
   useEffect(() => {
     if (id) {
@@ -120,6 +140,7 @@ export default function ImportTrip({ trips: propTrips, onTripsChange, onClose }:
         }
       }
 
+      clearImportState();
       navigate(`/trip/${targetTrip.id}`);
       onClose?.();
     } catch (err: any) {
@@ -136,7 +157,7 @@ export default function ImportTrip({ trips: propTrips, onTripsChange, onClose }:
     return (
       <div className="page">
         <div className="header">
-          <button className="btn btn-sm" onClick={() => onClose ? onClose() : navigate('/')}>{t('common.back')}</button>
+          <button className="btn btn-sm" onClick={() => { clearImportState(); onClose ? onClose() : navigate('/'); }}>{t('common.back')}</button>
           <h3>{t('import.title')}</h3>
         </div>
         <div>
@@ -194,7 +215,7 @@ export default function ImportTrip({ trips: propTrips, onTripsChange, onClose }:
   return (
     <div className="page">
       <div className="header">
-        <button className="btn btn-sm" onClick={() => onClose ? onClose() : navigate(trip ? `/trip/${trip.id}` : '/')}>{t('common.back')}</button>
+        <button className="btn btn-sm" onClick={() => { clearImportState(); onClose ? onClose() : navigate(trip ? `/trip/${trip.id}` : '/'); }}>{t('common.back')}</button>
         <h3>{t('import.title')} {isNewTrip ? `(${t('import.newLabel')})` : targetTrip ? `-> ${targetTrip.title}` : ''}</h3>
       </div>
 

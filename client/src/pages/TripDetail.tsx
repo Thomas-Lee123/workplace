@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { getTrip, updateTrip, updateItem, updateItemStatus, deleteItem, analyzeItem, streamAIChat, aiApplyChanges, reorderItem, downloadExport, type Trip, type ItemAnalysis, type SSEEvent } from '../api';
 import { useT } from '../i18n';
 
@@ -24,7 +24,8 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, ItemAnalysis>>({});
   const [expandedAnalysis, setExpandedAnalysis] = useState<string | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const chatOpen = searchParams.get('chat') === '1';
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatting, setChatting] = useState(false);
@@ -162,18 +163,32 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
     );
   }
 
-  function toggleChat() {
-    if (!chatOpen) {
-      setChatOpen(true);
-      if (chatMessages.length === 0 && trip) {
-        const days = trip.days.map(d => `${d.label}: ` + d.items.map(i => i.title).join(', ')).join('\n');
-        setChatMessages([{ role: 'ai', text: `${t('tripDetail.chat')}:\n${days}` }]);
-      }
-    } else {
-      ctrlRef.current?.abort();
-      setChatOpen(false);
+  function openChat() {
+    setSearchParams(prev => { prev.set('chat', '1'); return prev; });
+    if (chatMessages.length === 0 && trip) {
+      const days = trip.days.map(d => `${d.label}: ` + d.items.map(i => i.title).join(', ')).join('\n');
+      setChatMessages([{ role: 'ai', text: `${t('tripDetail.chat')}:\n${days}` }]);
     }
   }
+  function closeChat() {
+    ctrlRef.current?.abort();
+    setSearchParams(prev => { prev.delete('chat'); return prev; });
+  }
+
+  useEffect(() => {
+    if (chatOpen && trip && chatMessages.length > 0) {
+      try { localStorage.setItem(`chat_${trip.id}`, JSON.stringify(chatMessages)); } catch {}
+    }
+  }, [chatMessages, chatOpen, trip]);
+
+  useEffect(() => {
+    if (chatOpen && trip && chatMessages.length === 0) {
+      try {
+        const saved = localStorage.getItem(`chat_${trip.id}`);
+        if (saved) setChatMessages(JSON.parse(saved));
+      } catch {}
+    }
+  }, [chatOpen, trip]);
 
   useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [chatMessages]);
 
@@ -334,7 +349,7 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
       </div>
 
       {!chatOpen && (
-        <button className="chat-float-btn" onClick={toggleChat}>
+        <button className="chat-float-btn" onClick={openChat}>
           {t('tripDetail.chatButton')}
         </button>
       )}
@@ -344,7 +359,7 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
         <div className="chat-panel">
           <div className="chat-panel-header">
             {t('tripDetail.chat')}
-            <button className="chat-panel-close" onClick={toggleChat}>x</button>
+            <button className="chat-panel-close" onClick={closeChat}>x</button>
           </div>
           <div className="chat-messages" ref={chatRef}>
             {chatMessages.map((msg, i) => (
