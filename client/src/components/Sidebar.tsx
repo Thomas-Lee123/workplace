@@ -7,7 +7,7 @@ export default function Sidebar({ user, onLogout, trips, onTripsChange, onOpenPa
   user: User;
   onLogout: () => void;
   trips: Trip[];
-  onTripsChange: () => void;
+  onTripsChange: () => Promise<void>;
   onOpenPanel: (mode: 'ai' | 'import') => void;
   mobileOpen?: boolean;
 }) {
@@ -26,7 +26,7 @@ export default function Sidebar({ user, onLogout, trips, onTripsChange, onOpenPa
     const endDate = form.get('endDate') as string;
     if (!title || !destination || !startDate || !endDate) return;
     const trip = await createTrip({ title, destination, startDate, endDate });
-    onTripsChange();
+    await onTripsChange();
     setShowCreate(false);
     setShowNewMenu(false);
     navigate(`/trip/${trip.id}`);
@@ -35,7 +35,7 @@ export default function Sidebar({ user, onLogout, trips, onTripsChange, onOpenPa
   async function handleDelete(id: string) {
     if (!confirm(t('sidebar.deleteConfirm'))) return;
     await deleteTrip(id);
-    onTripsChange();
+    await onTripsChange();
     if (activeId === id) navigate('/');
   }
 
@@ -65,6 +65,14 @@ export default function Sidebar({ user, onLogout, trips, onTripsChange, onOpenPa
                 <div className="sidebar-trip-title">{trip.title}</div>
                 <div className="sidebar-trip-date">{trip.startDate.split('T')[0]} — {trip.endDate.split('T')[0]}</div>
               </div>
+              <button
+                className="sidebar-trip-delete"
+                onClick={e => {
+                  e.stopPropagation();
+                  handleDelete(trip.id);
+                }}
+                title={t('sidebar.deleteConfirm')}
+              >&times;</button>
             </div>
           ))}
         </div>
