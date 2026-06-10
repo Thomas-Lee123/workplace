@@ -22,6 +22,8 @@ export default function TripDetail({ onTripsChange: _onTripsChange }: { onTripsC
   const navigate = useNavigate();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [titleDraft, setTitleDraft] = useState('');
+  const titleRef = useRef('');
+  const savingRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, ItemAnalysis>>({});
@@ -39,6 +41,7 @@ export default function TripDetail({ onTripsChange: _onTripsChange }: { onTripsC
     getTrip(id).then(t => {
       setTrip(t);
       setTitleDraft(t.title);
+      titleRef.current = t.title;
       const saved: Record<string, ItemAnalysis> = {};
       for (const day of t.days) {
         for (const item of day.items) {
@@ -69,10 +72,19 @@ export default function TripDetail({ onTripsChange: _onTripsChange }: { onTripsC
     setEditingField(null);
   }
 
-  async function saveTitle(val: string) {
-    if (!val.trim() || !trip) return;
-    await updateTrip(trip.id, { title: val.trim(), destination: trip.destination, startDate: trip.startDate, endDate: trip.endDate });
-    setTrip(prev => prev ? { ...prev, title: val.trim() } : prev);
+  async function saveTitle() {
+    if (savingRef.current) return;
+    const val = titleRef.current.trim();
+    if (!val || !trip) return;
+    savingRef.current = true;
+    try {
+      await updateTrip(trip.id, { title: val, destination: trip.destination, startDate: trip.startDate, endDate: trip.endDate });
+      setTrip(prev => prev ? { ...prev, title: val } : prev);
+    } catch (err: any) {
+      alert(err.message || t('common.failed'));
+    } finally {
+      savingRef.current = false;
+    }
   }
 
   async function handlePasteLink(itemId: string, url: string) {
@@ -160,9 +172,9 @@ export default function TripDetail({ onTripsChange: _onTripsChange }: { onTripsC
             <input
               className="page-title"
               value={titleDraft}
-              onChange={e => setTitleDraft(e.target.value)}
-              onBlur={e => saveTitle(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') saveTitle(e.currentTarget.value); }}
+              onChange={e => { setTitleDraft(e.target.value); titleRef.current = e.target.value; }}
+              onBlur={() => saveTitle()}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
             />
           </div>
           <div className="page-meta">
