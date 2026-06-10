@@ -324,7 +324,7 @@ router.delete('/:tripId/items/:itemId', async (req: AuthRequest, res: Response) 
 
 // ==================== HELPERS ====================
 
-function generateDays(start: Date, end: Date) {
+function generateDays(start: Date, end: Date, labels?: string[]) {
   const days = [];
   const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   for (let i = 0; i < diff; i++) {
@@ -332,7 +332,7 @@ function generateDays(start: Date, end: Date) {
     d.setDate(d.getDate() + i);
     days.push({
       date: d,
-      label: `第${i + 1}天`,
+      label: (labels && labels[i]) || `Day ${i + 1}`,
       sortOrder: i,
     });
   }

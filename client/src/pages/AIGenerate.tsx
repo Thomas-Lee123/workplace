@@ -23,7 +23,7 @@ function clearAIState() {
   localStorage.removeItem(AI_STATE_KEY);
 }
 
-export default function AIGenerate({ onClose }: { onClose?: () => void }) {
+export default function AIGenerate({ onClose, onTripsChange }: { onClose?: () => void; onTripsChange?: () => void }) {
   const { t } = useT();
   const navigate = useNavigate();
   const saved = loadAIState();
@@ -158,6 +158,7 @@ export default function AIGenerate({ onClose }: { onClose?: () => void }) {
       }
     }
     clearAIState();
+    onTripsChange?.();
     navigate(`/trip/${trip!.id}`);
     onClose?.();
   }

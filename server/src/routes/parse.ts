@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { auth, AuthRequest } from '../middleware/auth';
+import { deepSeek, MODEL, inferTypeFromText } from '../lib/ai-config';
 
 const router = Router();
 
@@ -279,17 +280,10 @@ function extractFromHTML(html: string): Partial<ParseResult> {
 
   const type = inferTypeFromText(html.slice(0, 5000));
 
-  return { title: h1 || title, type, price, imageUrl };
+  return { title: h1 || title, type: type || null, price, imageUrl };
 }
 
-function inferTypeFromText(text: string): string | null {
-  const t = text.toLowerCase();
-  if (t.includes('酒店') || t.includes('hotel') || t.includes('住宿') || t.includes('民宿')) return 'hotel';
-  if (t.includes('门票') || t.includes('景点') || t.includes('ticket') || t.includes('景区') || t.includes('公园')) return 'attraction';
-  if (t.includes('火车') || t.includes('高铁') || t.includes('动车') || t.includes('飞机') || t.includes('航班')) return 'traffic';
-  if (t.includes('餐厅') || t.includes('美食') || t.includes('自助') || t.includes('火锅')) return 'meal';
-  return null;
-}
+// inferTypeFromText imported from ../lib/ai-config
 
 function stripHtml(html: string): string {
   return html
@@ -307,10 +301,6 @@ function stripHtml(html: string): string {
 }
 
 // ==================== LAYER 5: AI FALLBACK ====================
-
-const DEEPSEEK_URL = 'https://api.deepseek.com/v1/chat/completions';
-const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || '';
-const MODEL = 'deepseek-v4-flash';
 
 const PLATFORM_HINTS: Record<string, string> = {
   ctrip: '携程旅行网。URL中可能包含hotel(酒店)、ticket(门票)、flight(机票)等路径，通过路径和标题判断类型。',
@@ -348,22 +338,10 @@ ${hint}
 4. 价格只在文本中明确提到时填写`;
 
   try {
-    const res = await fetch(DEEPSEEK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${DEEPSEEK_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `链接: ${url}\n平台: ${source}\n页面文本: ${text || '无法获取页面内容'}` },
-        ],
-        max_tokens: 512,
-        temperature: 0.1,
-      }),
-    });
+    const res = await deepSeek([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `链接: ${url}\n平台: ${source}\n页面文本: ${text || '无法获取页面内容'}` },
+    ]);
 
     if (!res.ok) {
       throw new Error(`AI 请求失败 (${res.status})`);

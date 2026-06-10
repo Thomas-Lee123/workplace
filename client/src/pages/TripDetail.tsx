@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { getTrip, updateTrip, updateItem, updateItemStatus, deleteItem, analyzeItem, streamAIChat, aiApplyChanges, reorderItem, downloadExport, proxyImageUrl, type Trip, type ItemAnalysis, type SSEEvent } from '../api';
+import { getTrip, updateTrip, updateItem, updateItemStatus, deleteItem, analyzeItem, downloadExport, reorderItem, proxyImageUrl, type Trip, type ItemAnalysis } from '../api';
 import { useT } from '../i18n';
+import { buildSearchUrl } from '../lib/searchUrls';
+import ChatPanel from '../components/ChatPanel';
 
 const TYPE_ORDER: Record<string, number> = { traffic: 0, hotel: 1, attraction: 2, meal: 3, custom: 4 };
 
@@ -14,8 +16,7 @@ function sortItems(items: any[]): any[] {
   });
 }
 
-export default function TripDetail({ onTripsChange }: { onTripsChange?: () => void }) {
-  void onTripsChange;
+export default function TripDetail({ onTripsChange: _onTripsChange }: { onTripsChange?: () => void }) {
   const { t } = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -26,11 +27,6 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
   const [expandedAnalysis, setExpandedAnalysis] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const chatOpen = searchParams.get('chat') === '1';
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatting, setChatting] = useState(false);
-  const chatRef = useRef<HTMLDivElement>(null);
-  const ctrlRef = useRef<AbortController | null>(null);
   const [editingField, setEditingField] = useState<{ itemId: string; field: string } | null>(null);
   const [_dragItemId, setDragItemId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -118,10 +114,6 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
   }
   function handleDragEnd() { dragItemRef.current = null; setDragItemId(null); }
 
-  function handleDayDragOver(e: React.DragEvent) {
-    e.preventDefault();
-  }
-
   async function handleDrop(e: React.DragEvent, targetDayId: string) {
     e.preventDefault();
     const itemId = dragItemRef.current;
@@ -142,55 +134,14 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
     } catch (err: any) { alert(err.message || t('tripDetail.moveFailed')); }
   }
 
-  // ==================== AI Chat ====================
-
-  async function handleChat() {
-    if (!chatInput.trim() || chatting || !trip) return;
-    const msg = chatInput.trim();
-    setChatInput('');
-    setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
-    setChatting(true);
-    let fullReply = '';
-    ctrlRef.current = streamAIChat(trip.id, msg,
-      (e: SSEEvent) => {
-        if (e.content) { fullReply += e.content; setChatMessages(prev => { const c = [...prev]; const l = c[c.length - 1]; if (l?.role === 'ai') l.text = fullReply; else c.push({ role: 'ai', text: fullReply }); return c; }); }
-      },
-      async (tripData, changes) => {
-        try { const updated = await aiApplyChanges(trip.id, tripData); setTrip(updated); setChatMessages(prev => [...prev, { role: 'ai', text: (changes || t('tripDetail.applied')) }]); } catch (err: any) { setChatMessages(prev => [...prev, { role: 'ai', text: t('common.failed') + ': ' + err.message }]); }
-        setChatting(false);
-      },
-      (err: Error) => { setChatMessages(prev => [...prev, { role: 'ai', text: t('common.error') + ': ' + err.message }]); setChatting(false); },
-    );
-  }
+  // ==================== Chat ====================
 
   function openChat() {
     setSearchParams(prev => { prev.set('chat', '1'); return prev; });
-    if (chatMessages.length === 0 && trip) {
-      const days = trip.days.map(d => `${d.label}: ` + d.items.map(i => i.title).join(', ')).join('\n');
-      setChatMessages([{ role: 'ai', text: `${t('tripDetail.chat')}:\n${days}` }]);
-    }
   }
   function closeChat() {
-    ctrlRef.current?.abort();
     setSearchParams(prev => { prev.delete('chat'); return prev; });
   }
-
-  useEffect(() => {
-    if (chatOpen && trip && chatMessages.length > 0) {
-      try { localStorage.setItem(`chat_${trip.id}`, JSON.stringify(chatMessages)); } catch {}
-    }
-  }, [chatMessages, chatOpen, trip]);
-
-  useEffect(() => {
-    if (chatOpen && trip && chatMessages.length === 0) {
-      try {
-        const saved = localStorage.getItem(`chat_${trip.id}`);
-        if (saved) setChatMessages(JSON.parse(saved));
-      } catch {}
-    }
-  }, [chatOpen, trip]);
-
-  useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [chatMessages]);
 
   // ==================== Render ====================
 
@@ -223,7 +174,7 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
           const sorted = sortItems(day.items);
           return (
             <div key={day.id} className="day"
-              onDragOver={handleDayDragOver}
+              onDragOver={e => e.preventDefault()}
               onDrop={e => handleDrop(e, day.id)}
             >
               <div className="day-header">
@@ -282,7 +233,7 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
                       <div className="block-meta">
                         {item.price && <span className="block-price">{item.price.toLocaleString()}</span>}
                         <button className={`block-status ${item.status}`} onClick={() => toggleStatus(item.id, item.status)}>
-                          {item.status === 'pending' ? t('tripDetail.pending') : item.status === 'purchased' ? t('tripDetail.purchased') : t('tripDetail.cancelled')}
+                          {t(item.status === 'pending' ? 'tripDetail.pending' : item.status === 'purchased' ? 'tripDetail.purchased' : 'tripDetail.cancelled')}
                         </button>
                       </div>
 
@@ -290,10 +241,10 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
                         {item.sourceUrl ? (
                           <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="block-link block-link-primary">{t('tripDetail.openSource')}</a>
                         ) : (
-                          <a href={`https://hotels.ctrip.com/hotels/list?${new URLSearchParams({ cityName: trip.destination, destName: trip.destination, searchWord: item.title, searchType: 'D', optionId: '1', crn: '1', curr: 'CNY', locale: 'zh-CN' }).toString()}`} target="_blank" rel="noopener noreferrer" className="block-link block-link-primary">{t('tripDetail.searchCtrip')}</a>
+                          <a href={buildSearchUrl('ctrip', item, trip.destination, { start: trip.startDate, end: trip.endDate })} target="_blank" rel="noopener noreferrer" className="block-link block-link-primary">{t('tripDetail.searchCtrip')}</a>
                         )}
-                        <a href={`https://www.fliggy.com/ifi/search.htm?q=${encodeURIComponent(item.title)}`} target="_blank" rel="noopener noreferrer" className="block-link">{t('source.fliggy')}</a>
-                        <a href={`https://m.ly.com/hotel/search?keyword=${encodeURIComponent(item.title)}`} target="_blank" rel="noopener noreferrer" className="block-link">{t('site.tongcheng')}</a>
+                        <a href={buildSearchUrl('fliggy', item, trip.destination)} target="_blank" rel="noopener noreferrer" className="block-link">{t('source.fliggy')}</a>
+                        <a href={buildSearchUrl('tongcheng', item, trip.destination)} target="_blank" rel="noopener noreferrer" className="block-link">{t('site.tongcheng')}</a>
                         <input className="block-link-input" placeholder={t('tripDetail.pasteLink')}
                           onKeyDown={e => {
                             if (e.key === 'Enter') {
@@ -354,27 +305,12 @@ export default function TripDetail({ onTripsChange }: { onTripsChange?: () => vo
         </button>
       )}
 
-      {/* Chat panel */}
-      {chatOpen && (
-        <div className="chat-panel">
-          <div className="chat-panel-header">
-            {t('tripDetail.chat')}
-            <button className="chat-panel-close" onClick={closeChat}>x</button>
-          </div>
-          <div className="chat-messages" ref={chatRef}>
-            {chatMessages.map((msg, i) => (
-              <div key={i} className={`chat-msg ${msg.role}`}>{msg.text}</div>
-            ))}
-            {chatting && <div style={{ color: '#9b9a97', fontSize: 12 }}>{t('tripDetail.thinking')}</div>}
-          </div>
-          <div className="chat-input-row">
-            <input value={chatInput} onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleChat(); }}
-              placeholder={t('tripDetail.chatPlaceholder')}
-            />
-            <button className="btn btn-sm" onClick={handleChat} disabled={chatting || !chatInput.trim()}>{t('common.send')}</button>
-          </div>
-        </div>
+      {chatOpen && trip && (
+        <ChatPanel
+          trip={trip}
+          onTripUpdate={setTrip}
+          onClose={closeChat}
+        />
       )}
     </div>
   );

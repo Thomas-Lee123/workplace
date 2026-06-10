@@ -237,6 +237,17 @@ export function streamAIGenerate(
   onError: (err: Error) => void,
 ): AbortController {
   const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout>;
+
+  function resetTimeout() {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+      controller.abort();
+      onError(new Error('AI 响应超时，请重试'));
+    }, 120000);
+  }
+
+  resetTimeout();
 
   fetch('/api/ai/generate-stream', {
     method: 'POST',
@@ -258,8 +269,9 @@ export function streamAIGenerate(
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) { clearTimeout(timeout); break; }
 
+      resetTimeout();
       buf += decoder.decode(value, { stream: true });
       const lines = buf.split('\n');
       buf = lines.pop() || '';
@@ -282,6 +294,7 @@ export function streamAIGenerate(
       }
     }
 
+    clearTimeout(timeout);
     if (!hasError && !hasDone) {
       onError(new Error('AI 生成超时，请重试'));
     }
@@ -300,6 +313,17 @@ export function streamAIChat(
   onError: (err: Error) => void,
 ): AbortController {
   const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout>;
+
+  function resetTimeout() {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+      controller.abort();
+      onError(new Error('AI 响应超时，请重试'));
+    }, 120000);
+  }
+
+  resetTimeout();
 
   fetch('/api/ai/chat-stream', {
     method: 'POST',
@@ -322,8 +346,9 @@ export function streamAIChat(
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) { clearTimeout(timeout); break; }
 
+      resetTimeout();
       buf += decoder.decode(value, { stream: true });
       const lines = buf.split('\n');
       buf = lines.pop() || '';
@@ -348,6 +373,7 @@ export function streamAIChat(
       }
     }
 
+    clearTimeout(timeout);
     if (!hasError) {
       if (lastTripData) {
         onDone(lastTripData, lastChanges);

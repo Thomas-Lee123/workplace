@@ -4,6 +4,7 @@ import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import path from 'path';
 import { auth, AuthRequest } from '../middleware/auth';
+import { inferTypeFromText } from '../lib/ai-config';
 
 const router = Router();
 router.use(auth);
@@ -291,15 +292,6 @@ function parseItemLine(line: string): ImportItem {
   const note = parts.slice(1).join(' ');
 
   return { type, title, price, note: note || undefined };
-}
-
-function inferTypeFromText(text: string): string {
-  const t = text.toLowerCase();
-  if (t.includes('酒店') || t.includes('hotel') || t.includes('住宿') || t.includes('住')) return 'hotel';
-  if (t.includes('景点') || t.includes('门票') || t.includes('attraction') || t.includes('游') || t.includes('玩')) return 'attraction';
-  if (t.includes('交通') || t.includes('火车') || t.includes('高铁') || t.includes('飞机') || t.includes('航班') || t.includes('traffic') || t.includes('车')) return 'traffic';
-  if (t.includes('餐') || t.includes('饭') || t.includes('食') || t.includes('meal') || t.includes('吃')) return 'meal';
-  return 'custom';
 }
 
 export default router;

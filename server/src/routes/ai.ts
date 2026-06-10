@@ -2,13 +2,10 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { auth, AuthRequest } from '../middleware/auth';
 import prisma from '../lib/prisma';
+import { DEEPSEEK_URL, DEEPSEEK_KEY, MODEL, inferTypeFromText } from '../lib/ai-config';
 
 const router = Router();
 router.use(auth);
-
-const DEEPSEEK_URL = 'https://api.deepseek.com/v1/chat/completions';
-const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || '';
-const MODEL = 'deepseek-v4-flash';
 
 interface StreamChunk {
   content: string;
@@ -115,9 +112,11 @@ const SYSTEM_GENERATE = `你是旅行行程规划助手。根据用户描述生�
 规则：
 1. 如果用户没指定日期，假设从最近一个周末开始
 2. 每天2-5个项目，不要太紧凑
-3. 价格根据常识估算（人民币），不确定填0
+3. 价格根据常识估算，不确定填0
 4. type: hotel(酒店)、attraction(景点/门票)、traffic(交通)、meal(餐饮)、custom(其他)
-5. 先写文字介绍，最后给JSON`;
+5. 非常重要：每一天都必须包含一个hotel住宿项目！即使是同一家酒店连住多晚，也要在每一天都添加该酒店项目，每天的价格填单晚价格。例如4天行程住同一家酒店¥400/晚，则Day1~Day4每天都要有hotel类型价格400的项目
+6. 餐饮(meal)同理，建议每天至少1-2餐，不要只在某一天集中安排
+7. 先写文字介绍，最后给JSON`;
 
 router.post('/generate-stream', async (req: AuthRequest, res: Response) => {
   const result = generateSchema.safeParse(req.body);
@@ -207,6 +206,8 @@ const SYSTEM_CHAT = `你是旅行行程助手。用户已经有了一个行程�
 你需要理解用户的修改需求，然后：
 1. 用自然语言回复用户，解释你将会如何修改
 2. 在最后给出一个 JSON 代码块（\`\`\`json ... \`\`\`），包含修改后的完整行程数据
+
+关键规则：每一天都必须包含住宿项目（hotel）！即使同一酒店连住多晚，也要在每一天都添加该酒店。每天的价格填单晚价格。
 
 JSON 格式：
 {
@@ -659,7 +660,8 @@ const SYSTEM_PARSE_URL = `你是旅行行程规划助手。用户提供了一个
 5. 日期从最近一个周六开始推算
 6. 如果网页没有明确日期，根据天数推断
 7. 价格如果能从网页提取就填写，否则填null
-8. 尽量保留原行程中的特色安排和细节描述`;
+8. 每一天都要有hotel住宿项目！同一酒店连住多晚也要在每天重复添加，每天填单晚价格
+9. 尽量保留原行程中的特色安排和细节描述`;
 
 router.post('/parse-url', async (req: AuthRequest, res: Response) => {
   const result = parseUrlSchema.safeParse(req.body);
