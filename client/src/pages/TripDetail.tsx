@@ -21,6 +21,7 @@ export default function TripDetail({ onTripsChange: _onTripsChange }: { onTripsC
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [titleDraft, setTitleDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, ItemAnalysis>>({});
@@ -34,8 +35,10 @@ export default function TripDetail({ onTripsChange: _onTripsChange }: { onTripsC
 
   useEffect(() => {
     if (!id) return;
+    setLoading(true);
     getTrip(id).then(t => {
       setTrip(t);
+      setTitleDraft(t.title);
       const saved: Record<string, ItemAnalysis> = {};
       for (const day of t.days) {
         for (const item of day.items) {
@@ -155,11 +158,11 @@ export default function TripDetail({ onTripsChange: _onTripsChange }: { onTripsC
         <div className="page-header">
           <div className="page-header-top">
             <input
-              key={trip.id}
               className="page-title"
-              defaultValue={trip.title}
+              value={titleDraft}
+              onChange={e => setTitleDraft(e.target.value)}
               onBlur={e => saveTitle(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') saveTitle((e.target as HTMLInputElement).value); }}
+              onKeyDown={e => { if (e.key === 'Enter') saveTitle(e.currentTarget.value); }}
             />
           </div>
           <div className="page-meta">
