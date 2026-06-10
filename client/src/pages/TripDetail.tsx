@@ -155,6 +155,7 @@ export default function TripDetail({ onTripsChange: _onTripsChange }: { onTripsC
         <div className="page-header">
           <div className="page-header-top">
             <input
+              key={trip.id}
               className="page-title"
               defaultValue={trip.title}
               onBlur={e => saveTitle(e.target.value)}
