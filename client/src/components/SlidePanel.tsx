@@ -7,7 +7,7 @@ export default function SlidePanel({ mode, onClose, trips, onTripsChange }: {
   mode: 'ai' | 'import';
   onClose: () => void;
   trips: Trip[];
-  onTripsChange: () => void;
+  onTripsChange: () => Promise<void>;
 }) {
   const { t } = useT();
   return (

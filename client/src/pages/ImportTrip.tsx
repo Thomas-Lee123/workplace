@@ -29,7 +29,7 @@ function clearImportState() {
   localStorage.removeItem(IMPORT_STATE_KEY);
 }
 
-export default function ImportTrip({ trips: propTrips, onTripsChange: _onTripsChange, onClose }: { trips?: Trip[]; onTripsChange?: () => void; onClose?: () => void }) {
+export default function ImportTrip({ trips: propTrips, onTripsChange: _onTripsChange, onClose }: { trips?: Trip[]; onTripsChange?: () => Promise<void>; onClose?: () => void }) {
   const { t } = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
