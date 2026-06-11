@@ -1,11 +1,31 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 dist-ssr/
-*.local
+
+# Environment
 .env
+*.local
+.claude/settings.local.json
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
 *.log
+
+# Archives
 *.tar.gz
+*.zip
+
+# Temp / junk
+*.py
+minecraftinstance.json
+
+# Screenshot references
 ref.png
 ref_small.jpg
 ScreenShot_*.png

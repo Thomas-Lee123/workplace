@@ -29,7 +29,7 @@ function clearImportState() {
   localStorage.removeItem(IMPORT_STATE_KEY);
 }
 
-export default function ImportTrip({ trips: propTrips, onTripsChange: _onTripsChange, onClose }: { trips?: Trip[]; onTripsChange?: () => Promise<void>; onClose?: () => void }) {
+export default function ImportTrip({ trips: propTrips, onTripsChange, onClose }: { trips?: Trip[]; onTripsChange?: () => Promise<void>; onClose?: () => void }) {
   const { t } = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -119,6 +119,7 @@ export default function ImportTrip({ trips: propTrips, onTripsChange: _onTripsCh
           startDate: d.startDate || dates.startDate,
           endDate: d.endDate || dates.endDate,
         });
+        await onTripsChange?.();
       }
 
       for (let di = 0; di < result.days.length; di++) {

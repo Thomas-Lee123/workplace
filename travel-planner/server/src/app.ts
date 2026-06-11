@@ -16,6 +16,9 @@ app.set('trust proxy', 1);
 
 const allowedOrigins = [
   'https://lsy567.com',
+  'http://lsy567.com',
+  'http://8.148.24.128',
+  'https://8.148.24.128',
   'http://localhost:5173',
   'http://localhost:4173',
 ];
